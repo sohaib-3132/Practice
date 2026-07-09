@@ -1,35 +1,26 @@
-# This list holds all tasks for the current session only.
-# Each task is a dictionary with keys: id, title, description, priority, status
+#This list holds all tasks for the current session only and each task is a dict w keys
 todo_list = []
 
-# Valid values allowed for certain fields (used for input validation)
+#Valid values allowed for each field (input validation)
 VALID_PRIORITIES = ["low", "medium", "high"]
 VALID_STATUSES = ["pending", "completed"]
 
 # HELPER FUNCTIONS
 
 def generate_task_id():
-    """
-    Generates a new unique ID for a task.
-    Uses max with a generator and default=0 so empty list -> start from 1.
-    """
+    # create new unique ID for a task.
+    # max finds the highest existing ID, then adds 1 for new task.
     return max((t["id"] for t in todo_list), default=0) + 1
 
 
 def find_task_by_id(task_id):
-    """
-    Searches todo_list for a task matching the given task_id.
-    Returns the task dictionary if found, otherwise returns None.
-    """
+    #search todo list and return the first task dict which has same id to taskid, none if not found
     return next((t for t in todo_list if t["id"] == task_id), None)
 
 
 def get_valid_input(prompt, valid_options=None):
-    """
-    Takes user input and validates it.
-    If valid_options is provided, keeps asking until input matches one of them.
-    Prevents crashes/invalid data from entering the system.
-    """
+    # tell the user write and validate the input.
+    # if valid_options given, keep asking until a valid choice is entered.
     while True:
         user_input = input(prompt).strip().lower()
         if valid_options is None:
@@ -43,9 +34,7 @@ def get_valid_input(prompt, valid_options=None):
 
 
 def get_int_input(prompt):
-    """
-    Prompt for integer input. Returns int or None if invalid.
-    """
+    # Ask for an integer and return it, or None if the input is invalid.
     try:
         return int(input(prompt))
     except ValueError:
@@ -58,14 +47,8 @@ def get_int_input(prompt):
 # ---------------------------------------------------
 
 def create_task(title, description, priority):
-    """
-    Creates a new task and adds it to todo_list.
-    Parameters:
-        title (str): short name of the task
-        description (str): details about the task
-        priority (str): 'low', 'medium', or 'high'
-    New tasks always start with status = 'pending'.
-    """
+    # Create a new task dict and add it to the list.
+    # New tasks start with status 'pending'.
     new_task = {
         "id": generate_task_id(),
         "title": title,
@@ -78,10 +61,7 @@ def create_task(title, description, priority):
 
 
 def view_tasks():
-    """
-    Displays all tasks currently in todo_list in a readable format.
-    Shows a message if there are no tasks yet.
-    """
+    # Show all tasks to read, or a message if none exist.
     if not todo_list:
         print("\n📭 No tasks found. Your to-do list is empty.\n")
         return
@@ -94,11 +74,7 @@ def view_tasks():
 
 def update_task(task_id, new_title=None, new_description=None,
                  new_priority=None, new_status=None):
-    """
-    Updates fields of an existing task identified by task_id.
-    Only updates the fields that are provided (not None).
-    Leaves other fields unchanged.
-    """
+    # Update the given fields of a task if the task exists.
     task = find_task_by_id(task_id)
 
     if task is None:
@@ -116,10 +92,7 @@ def update_task(task_id, new_title=None, new_description=None,
 
 
 def delete_task(task_id):
-    """
-    Deletes a task from todo_list based on its task_id.
-    Prints a confirmation message or an error if not found.
-    """
+    # delete a task by ID and confirm, or warn if it is missing.
     task = find_task_by_id(task_id)
 
     if task is None:
@@ -131,10 +104,7 @@ def delete_task(task_id):
 
 
 def mark_task_complete(task_id):
-    """
-    Shortcut function to mark a task's status as 'completed'.
-    Reuses find_task_by_id() to locate the task.
-    """
+    # Mark the task as 'completed' if it exists.
     task = find_task_by_id(task_id)
 
     if task is None:
@@ -150,9 +120,7 @@ def mark_task_complete(task_id):
 # ---------------------------------------------------
 
 def display_menu():
-    """
-    Prints the main menu options for the user.
-    """
+    # Print the main menu options for user.
     print("""========== TO-DO LIST MENU ==========
 1. Create a new task
 2. View all tasks
@@ -168,11 +136,7 @@ def display_menu():
 # ---------------------------------------------------
 
 def main():
-    """
-    Main entry point of the program.
-    Runs an infinite loop showing the menu and handling user choices
-    until the user selects 'Exit'.
-    """
+    # Main program loop: show menu and handle user choices until exit.
     print("\nWelcome to your Terminal To-Do List App!\n")
 
     while True:
