@@ -1,26 +1,74 @@
-#This list holds all tasks for the current session only and each task is a dict w keys
-todo_list = []
+import sqlite3
 
-#Valid values allowed for each field (input validation)
+# Valid values allowed for each field (input validation)
 VALID_PRIORITIES = ["low", "medium", "high"]
 VALID_STATUSES = ["pending", "completed"]
+DB_NAME = "todo.db"
 
-# HELPER FUNCTIONS
+
+# ---------------------------------------------------
+# DATABASE SETUP & CONNECTION HELPERS
+# ---------------------------------------------------
+
+def get_db_connection():
+    """
+    Establishes a connection to the SQLite database.
+    Configures row_factory to access columns by name like a dictionary.
+    """
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    """
+    Creates the 'tasks' table automatically if it doesn't exist yet.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            priority TEXT,
+            status TEXT DEFAULT 'pending'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
 
 def generate_task_id():
-    # create new unique ID for a task.
-    # max finds the highest existing ID, then adds 1 for new task.
-    return max((t["id"] for t in todo_list), default=0) + 1
+    """
+    Returns the next available task ID based on the highest existing row.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(id) FROM tasks")
+    result = cursor.fetchone()[0]
+    conn.close()
+    return (result or 0) + 1
 
 
 def find_task_by_id(task_id):
-    #search todo list and return the first task dict which has same id to taskid, none if not found
-    return next((t for t in todo_list if t["id"] == task_id), None)
+    """
+    Queries the database for a single task matching the given task_id.
+    Returns the Row object if found, otherwise returns None.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    task = cursor.fetchone()
+    conn.close()
+    return task
 
 
 def get_valid_input(prompt, valid_options=None):
-    # tell the user write and validate the input.
-    # if valid_options given, keep asking until a valid choice is entered.
+    """
+    Takes user input and validates it.
+    If valid_options is provided, keeps asking until input matches one of them.
+    """
     while True:
         user_input = input(prompt).strip().lower()
         if valid_options is None:
@@ -34,7 +82,9 @@ def get_valid_input(prompt, valid_options=None):
 
 
 def get_int_input(prompt):
-    # Ask for an integer and return it, or None if the input is invalid.
+    """
+    Prompt for integer input. Returns int or None if invalid.
+    """
     try:
         return int(input(prompt))
     except ValueError:
@@ -47,71 +97,110 @@ def get_int_input(prompt):
 # ---------------------------------------------------
 
 def create_task(title, description, priority):
-    # Create a new task dict and add it to the list.
-    # New tasks start with status 'pending'.
-    new_task = {
-        "id": generate_task_id(),
-        "title": title,
-        "description": description,
-        "priority": priority,
-        "status": "pending"
-    }
-    todo_list.append(new_task)
-    print(f"\n✅ Task '{title}' created successfully with ID {new_task['id']}.\n")
+    """
+    Creates a new task and inserts it into the SQLite tasks table.
+    """
+    new_task_id = generate_task_id()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO tasks (id, title, description, priority, status) VALUES (?, ?, ?, ?, 'pending')",
+        (new_task_id, title, description, priority)
+    )
+    conn.commit()
+    conn.close()
+    print(f"\n✅ Task '{title}' created successfully with ID {new_task_id}.\n")
 
 
 def view_tasks():
-    # Show all tasks to read, or a message if none exist.
-    if not todo_list:
-        print("\n📭 No tasks found. Your to-do list is empty.\n")
+    """
+    Fetches and displays all tasks currently stored in the SQLite database.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks")
+    tasks = cursor.fetchall()
+    conn.close()
+
+    if not tasks:
+        print("\n📭 No tasks found. Your to-do DB is empty.\n")
         return
 
     print("\n---------------- YOUR TASKS ----------------")
-    for task in todo_list:
-        print(f"ID: {task['id']}\nTitle: {task['title']}\nDescription: {task['description']}\nPriority: {task['priority']}\nStatus: {task['status']}\n---------------------------------------------")
+    for task in tasks:
+        print(
+            f"ID: {task['id']}\n"
+            f"Title: {task['title']}\n"
+            f"Description: {task['description']}\n"
+            f"Priority: {task['priority']}\n"
+            f"Status: {task['status']}\n"
+            f"---------------------------------------------"
+        )
     print()
 
 
 def update_task(task_id, new_title=None, new_description=None,
                  new_priority=None, new_status=None):
-    # Update the given fields of a task if the task exists.
+    """
+    Updates the specified fields of an existing task identified by task_id.
+    """
     task = find_task_by_id(task_id)
 
     if task is None:
         print(f"\n⚠️ Task with ID {task_id} not found.\n")
         return
 
-    for key, value in (("title", new_title),
-                       ("description", new_description),
-                       ("priority", new_priority),
-                       ("status", new_status)):
-        if value is not None:
-            task[key] = value
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    if new_title is not None:
+        cursor.execute("UPDATE tasks SET title = ? WHERE id = ?", (new_title, task_id))
+    if new_description is not None:
+        cursor.execute("UPDATE tasks SET description = ? WHERE id = ?", (new_description, task_id))
+    if new_priority is not None:
+        cursor.execute("UPDATE tasks SET priority = ? WHERE id = ?", (new_priority, task_id))
+    if new_status is not None:
+        cursor.execute("UPDATE tasks SET status = ? WHERE id = ?", (new_status, task_id))
+
+    conn.commit()
+    conn.close()
     print(f"\n✅ Task with ID {task_id} updated successfully.\n")
 
 
 def delete_task(task_id):
-    # delete a task by ID and confirm, or warn if it is missing.
+    """
+    Deletes a specific row matching the given task_id from the database.
+    """
     task = find_task_by_id(task_id)
 
     if task is None:
         print(f"\n⚠️ Task with ID {task_id} not found.\n")
         return
 
-    todo_list.remove(task)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
     print(f"\n🗑️ Task with ID {task_id} deleted successfully.\n")
 
 
 def mark_task_complete(task_id):
-    # Mark the task as 'completed' if it exists.
+    """
+    Shortcut function to immediately set a specific task's status to 'completed'.
+    """
     task = find_task_by_id(task_id)
 
     if task is None:
         print(f"\n⚠️ Task with ID {task_id} not found.\n")
         return
 
-    task["status"] = "completed"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE tasks SET status = 'completed' WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
     print(f"\n🎯 Task with ID {task_id} marked as completed.\n")
 
 
@@ -120,7 +209,6 @@ def mark_task_complete(task_id):
 # ---------------------------------------------------
 
 def display_menu():
-    # Print the main menu options for user.
     print("""========== TO-DO LIST MENU ==========
 1. Create a new task
 2. View all tasks
@@ -136,7 +224,7 @@ def display_menu():
 # ---------------------------------------------------
 
 def main():
-    # Main program loop: show menu and handle user choices until exit.
+    init_db()
     print("\nWelcome to your Terminal To-Do List App!\n")
 
     while True:
@@ -144,7 +232,6 @@ def main():
         choice = get_valid_input("Enter your choice (1-6): ",
                                   ["1", "2", "3", "4", "5", "6"])
 
-        # ---- CREATE ----
         if choice == "1":
             title = get_valid_input("Enter task title: ")
             description = get_valid_input("Enter task description: ")
@@ -153,11 +240,9 @@ def main():
             )
             create_task(title, description, priority)
 
-        # ---- VIEW ----
         elif choice == "2":
             view_tasks()
 
-        # ---- UPDATE ----
         elif choice == "3":
             view_tasks()
             task_id = get_int_input("Enter the ID of the task to update: ")
@@ -173,7 +258,6 @@ def main():
             update_task(task_id, new_title, new_description,
                         new_priority, new_status)
 
-        # ---- DELETE ----
         elif choice == "4":
             view_tasks()
             task_id = get_int_input("Enter the ID of the task to delete: ")
@@ -181,7 +265,6 @@ def main():
                 continue
             delete_task(task_id)
 
-        # ---- MARK COMPLETE ----
         elif choice == "5":
             view_tasks()
             task_id = get_int_input("Enter the ID of the task to mark complete: ")
@@ -189,9 +272,9 @@ def main():
                 continue
             mark_task_complete(task_id)
 
-        # ---- EXIT ----
         elif choice == "6":
-            print("\n👋 Exiting the To-Do List App. All data will be cleared. Goodbye!\n")
+            print("\n👋 Exiting the To-Do List App. All your updates have been saved to the database. Goodbye!\n")
             break
+
 if __name__ == "__main__":
     main()
